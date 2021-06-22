@@ -25,12 +25,14 @@ public:
 
 private slots:
     void on_pb_load_clicked();
-
     void on_pb_save_clicked();
+    void on_slider_scale_valueChanged(int value);
 
 private:
     Ui::MainWindow *ui;
     QGraphicsScene scene;
     QBitmap current_bitmap;
+    QGraphicsPixmapItem *org_ptr;
+    QGraphicsPixmapItem *bit_ptr;
 };
 #endif // MAINWINDOW_H

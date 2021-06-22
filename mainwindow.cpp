@@ -19,8 +19,9 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_pb_load_clicked()
 {
-    scene.clear();
-    current_bitmap.clear();
+    this->scene.clear();
+    this->current_bitmap.clear();
+    this->bit_ptr = nullptr;
 
     QString file = QFileDialog::getOpenFileName(this,
                                                 tr("Open File"),
@@ -30,8 +31,8 @@ void MainWindow::on_pb_load_clicked()
         return;
     }
 
-    scene.addPixmap(file);
-    current_bitmap = QBitmap(file);
+    this->org_ptr = scene.addPixmap(file);
+    this->current_bitmap = QBitmap(file);
     if(current_bitmap.isNull())
     {
         QMessageBox::warning(this, tr("Error"), tr("Cannot convert this format of file into Bitmap :'("));
@@ -39,11 +40,11 @@ void MainWindow::on_pb_load_clicked()
     }
 
     QPixmap pixmap = QPixmap::fromImage(current_bitmap.toImage());
-
-
-    QGraphicsPixmapItem *bit_ptr = scene.addPixmap(pixmap);
+    this->bit_ptr = scene.addPixmap(pixmap);
 
     bit_ptr->moveBy(pixmap.size().width(), 0);
+    ui->l_image_size->setText(QString::number(this->bit_ptr->pixmap().width()) + " x " +
+                              QString::number(this->bit_ptr->pixmap().height()));
 }
 
 
@@ -73,7 +74,17 @@ void MainWindow::on_pb_save_clicked()
 
     QImage input = current_bitmap.toImage();
 
-    output.write(QString("uint8_t image[" + QString::number(input.sizeInBytes())).toLocal8Bit() + "] = {\n");
+
+    // Struct
+    QString str_struct = QString("typedef struct\n{\n    uint16_t width, height;\n    uint8_t image_data["
+            + QString::number(input.sizeInBytes()) + "];\n} Image;\n\n");
+    output.write(str_struct.toLocal8Bit());
+
+    // Image data
+    output.write(QString("Image img = {\n    .width=" + QString::number(input.width()) + ",\n" +
+                         "    .height=" + QString::number(input.height()) + ",\n" +
+                         "    .image_data = {\n        ").toLocal8Bit());
+
     uchar *bits = input.scanLine(0);
     for(int i=0 ; i < input.sizeInBytes() ; i++)
     {
@@ -86,10 +97,32 @@ void MainWindow::on_pb_save_clicked()
 
         output.write(bitstr.toLocal8Bit());
 
-        if(i%20 == 0)
+        if(i%20 == 0 && i != 0)
         {
-            output.write("\n");
+            output.write("\n        ");
         }
     }
-    output.write("};\n");
+    output.write("\n    }\n};");
+}
+
+
+void MainWindow::on_slider_scale_valueChanged(int value)
+{
+    if(this->bit_ptr)
+    {
+        qreal scale = value / 100.0f;
+        printf("%f", scale);
+
+        this->org_ptr->setScale(scale);
+        ui->l_image_size->setText(QString::number(this->org_ptr->pixmap().width() * this->org_ptr->scale()) + " x " +
+                                  QString::number(this->org_ptr->pixmap().height() * this->org_ptr->scale()));
+
+        QPixmap zoomed(this->org_ptr->pixmap());
+        zoomed = zoomed.scaledToWidth(this->org_ptr->pixmap().width() * this->org_ptr->scale());
+        this->current_bitmap = QBitmap(zoomed);
+
+        this->scene.removeItem(this->bit_ptr);
+        this->bit_ptr = this->scene.addPixmap(QPixmap::fromImage(current_bitmap.toImage()));
+        bit_ptr->moveBy(this->current_bitmap.width(), 0);
+    }
 }
