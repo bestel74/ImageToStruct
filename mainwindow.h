@@ -23,6 +23,9 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
 
+public:
+    void load(QString file);
+
 private slots:
     void on_pb_load_clicked();
     void on_pb_save_clicked();

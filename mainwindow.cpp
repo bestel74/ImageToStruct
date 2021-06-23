@@ -1,6 +1,10 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
+#include <QPainter>
+#include <QDebug>
+#include <QSize>
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -9,6 +13,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
 
     ui->graphicsView->setScene(&scene);
+    ui->graphicsView->setMainPtr(this);
 }
 
 MainWindow::~MainWindow()
@@ -17,22 +22,16 @@ MainWindow::~MainWindow()
 }
 
 
-void MainWindow::on_pb_load_clicked()
+void MainWindow::load(QString file)
 {
     this->scene.clear();
     this->current_bitmap.clear();
     this->bit_ptr = nullptr;
-
-    QString file = QFileDialog::getOpenFileName(this,
-                                                tr("Open File"),
-                                                QDir::homePath());
-    if(file.isEmpty())
-    {
-        return;
-    }
+    ui->slider_scale->setValue(100);
 
     this->org_ptr = scene.addPixmap(file);
     this->current_bitmap = QBitmap(file);
+
     if(current_bitmap.isNull())
     {
         QMessageBox::warning(this, tr("Error"), tr("Cannot convert this format of file into Bitmap :'("));
@@ -45,6 +44,20 @@ void MainWindow::on_pb_load_clicked()
     bit_ptr->moveBy(pixmap.size().width(), 0);
     ui->l_image_size->setText(QString::number(this->bit_ptr->pixmap().width()) + " x " +
                               QString::number(this->bit_ptr->pixmap().height()));
+}
+
+
+void MainWindow::on_pb_load_clicked()
+{
+    QString file = QFileDialog::getOpenFileName(this,
+                                                tr("Open File"),
+                                                QDir::homePath());
+    if(file.isEmpty())
+    {
+        return;
+    }
+
+    load(file);
 }
 
 
@@ -81,9 +94,9 @@ void MainWindow::on_pb_save_clicked()
     output.write(str_struct.toLocal8Bit());
 
     // Image data
-    output.write(QString("Image img = {\n    .width=" + QString::number(input.width()) + ",\n" +
-                         "    .height=" + QString::number(input.height()) + ",\n" +
-                         "    .image_data = {\n        ").toLocal8Bit());
+    output.write(QString("Image img = {\n    .width=" + QString::number(this->org_ptr->pixmap().width() * this->org_ptr->scale()) + ",\n" +
+                         "    .height=" + QString::number(this->org_ptr->pixmap().height() * this->org_ptr->scale()) + ",\n" +
+                         "    .image_data = {").toLocal8Bit());
 
     uchar *bits = input.scanLine(0);
     for(int i=0 ; i < input.sizeInBytes() ; i++)
@@ -91,16 +104,16 @@ void MainWindow::on_pb_save_clicked()
         QString bitstr;
         uchar bit = bits[i];
 
+        if(i%20 == 0)
+        {
+            output.write("\n        ");
+        }
+
         bitstr.append("0x");
         bitstr.append(QString::number(bit, 16));
         if(i < input.sizeInBytes()-1) bitstr.append(", ");
 
         output.write(bitstr.toLocal8Bit());
-
-        if(i%20 == 0 && i != 0)
-        {
-            output.write("\n        ");
-        }
     }
     output.write("\n    }\n};");
 }
@@ -111,7 +124,6 @@ void MainWindow::on_slider_scale_valueChanged(int value)
     if(this->bit_ptr)
     {
         qreal scale = value / 100.0f;
-        printf("%f", scale);
 
         this->org_ptr->setScale(scale);
         ui->l_image_size->setText(QString::number(this->org_ptr->pixmap().width() * this->org_ptr->scale()) + " x " +

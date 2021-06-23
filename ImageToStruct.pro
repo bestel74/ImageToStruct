@@ -13,6 +13,7 @@ SOURCES += \
     mainwindow.cpp
 
 HEADERS += \
+    graphicsview.h \
     mainwindow.h
 
 FORMS += \
